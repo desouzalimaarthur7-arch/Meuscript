@@ -1,518 +1,625 @@
---// EGG / PET ESP - LOCAL SCRIPT
---// GUI + NOME + RARIDADE + $/S + DISTÂNCIA + ÍCONE
---// Atualização automática + ordenação por rendimento
-
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
 
-local Player = Players.LocalPlayer
-local PlayerGui = Player:WaitForChild("PlayerGui")
-
---==================================================
--- CONFIG
---==================================================
-
-local UPDATE_TIME = 0.25
-local MAX_DISTANCE = 1000
-local ESP_ATIVO = true
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
 
 --==================================================
--- TENTA ENCONTRAR MÓDULOS DO JOGO
+-- GUI
 --==================================================
 
-local function procurar(parent, nome)
-    local obj = parent:FindFirstChild(nome, true)
-    return obj
+local gui = Instance.new("ScreenGui")
+gui.Name = "DZIN7"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.Parent = playerGui
+
+local rgbObjects = {}
+
+local function addRGB(obj)
+	table.insert(rgbObjects, obj)
 end
 
-local EggStateModule = procurar(ReplicatedStorage, "EggState")
-local AssetsModule = procurar(ReplicatedStorage, "Assets")
-local MutationsModule = procurar(ReplicatedStorage, "Mutations")
-local EggRecordsModule = procurar(ReplicatedStorage, "EggRecords")
+RunService.RenderStepped:Connect(function()
+	local c = Color3.fromHSV((tick() % 5) / 5, .9, 1)
 
-local EggState
-local Assets
-local Mutations
-local EggRecords
+	for i = #rgbObjects, 1, -1 do
+		local obj = rgbObjects[i]
 
-pcall(function()
-    if EggStateModule and EggStateModule:IsA("ModuleScript") then
-        EggState = require(EggStateModule)
-    end
-end)
-
-pcall(function()
-    if AssetsModule and AssetsModule:IsA("ModuleScript") then
-        Assets = require(AssetsModule)
-    end
-end)
-
-pcall(function()
-    if MutationsModule and MutationsModule:IsA("ModuleScript") then
-        Mutations = require(MutationsModule)
-    end
-end)
-
-pcall(function()
-    if EggRecordsModule and EggRecordsModule:IsA("ModuleScript") then
-        EggRecords = require(EggRecordsModule)
-    end
+		if obj and obj.Parent then
+			obj.Color = c
+		else
+			table.remove(rgbObjects, i)
+		end
+	end
 end)
 
 --==================================================
--- GUI PRINCIPAL
+-- BOTÃO FLUTUANTE
 --==================================================
 
-local Gui = Instance.new("ScreenGui")
-Gui.Name = "EggPetESP"
-Gui.ResetOnSpawn = false
-Gui.Parent = PlayerGui
+local floating = Instance.new("TextButton")
+floating.Size = UDim2.fromOffset(62,62)
+floating.Position = UDim2.new(0,25,.5,-31)
+floating.BackgroundColor3 = Color3.fromRGB(12,12,17)
+floating.Text = "D7"
+floating.TextColor3 = Color3.new(1,1,1)
+floating.TextSize = 20
+floating.Font = Enum.Font.GothamBold
+floating.AutoButtonColor = false
+floating.ZIndex = 100
+floating.Parent = gui
 
-local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0, 360, 0, 420)
-Main.Position = UDim2.new(0.5, -180, 0.5, -210)
-Main.BackgroundColor3 = Color3.fromRGB(18,18,22)
-Main.BorderSizePixel = 0
-Main.Parent = Gui
+local fcorner = Instance.new("UICorner")
+fcorner.CornerRadius = UDim.new(1,0)
+fcorner.Parent = floating
 
-local Corner = Instance.new("UICorner")
-Corner.CornerRadius = UDim.new(0,14)
-Corner.Parent = Main
-
-local Stroke = Instance.new("UIStroke")
-Stroke.Color = Color3.fromRGB(90,90,100)
-Stroke.Thickness = 1
-Stroke.Parent = Main
-
---==================================================
--- TÍTULO
---==================================================
-
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, -20, 0, 45)
-Title.Position = UDim2.new(0,10,0,5)
-Title.BackgroundTransparency = 1
-Title.Text = "🥚 EGG / PET ESP"
-Title.TextColor3 = Color3.fromRGB(255,255,255)
-Title.Font = Enum.Font.GothamBold
-Title.TextSize = 20
-Title.Parent = Main
+local fstroke = Instance.new("UIStroke")
+fstroke.Thickness = 3
+fstroke.Parent = floating
+addRGB(fstroke)
 
 --==================================================
--- BOTÃO ESP
+-- PAINEL
 --==================================================
 
-local Toggle = Instance.new("TextButton")
-Toggle.Size = UDim2.new(1,-20,0,42)
-Toggle.Position = UDim2.new(0,10,0,55)
-Toggle.BackgroundColor3 = Color3.fromRGB(35,35,42)
-Toggle.TextColor3 = Color3.fromRGB(80,255,120)
-Toggle.Font = Enum.Font.GothamBold
-Toggle.TextSize = 16
-Toggle.Text = "ESP: ON"
-Toggle.Parent = Main
+local panel = Instance.new("Frame")
+panel.Size = UDim2.fromOffset(460,560)
+panel.Position = UDim2.new(.5,-230,.5,-280)
+panel.BackgroundColor3 = Color3.fromRGB(10,10,15)
+panel.Visible = false
+panel.Parent = gui
 
-local ToggleCorner = Instance.new("UICorner")
-ToggleCorner.CornerRadius = UDim.new(0,10)
-ToggleCorner.Parent = Toggle
+local pcorner = Instance.new("UICorner")
+pcorner.CornerRadius = UDim.new(0,22)
+pcorner.Parent = panel
 
-Toggle.MouseButton1Click:Connect(function()
-    ESP_ATIVO = not ESP_ATIVO
+local pstroke = Instance.new("UIStroke")
+pstroke.Thickness = 2
+pstroke.Parent = panel
+addRGB(pstroke)
 
-    Toggle.Text = ESP_ATIVO and "ESP: ON" or "ESP: OFF"
+--==================================================
+-- CABEÇALHO
+--==================================================
 
-    if not ESP_ATIVO then
-        for _,v in pairs(Main.List:GetChildren()) do
-            if v:IsA("Frame") then
-                v:Destroy()
-            end
-        end
-    end
-end)
+local header = Instance.new("Frame")
+header.Size = UDim2.new(1,-24,0,90)
+header.Position = UDim2.fromOffset(12,12)
+header.BackgroundColor3 = Color3.fromRGB(24,24,31)
+header.Parent = panel
+
+local hcorner = Instance.new("UICorner")
+hcorner.CornerRadius = UDim.new(0,16)
+hcorner.Parent = header
+
+local title = Instance.new("TextLabel")
+title.BackgroundTransparency = 1
+title.Position = UDim2.fromOffset(18,7)
+title.Size = UDim2.new(1,-36,0,35)
+title.Text = "DZIN7"
+title.TextColor3 = Color3.new(1,1,1)
+title.TextSize = 27
+title.Font = Enum.Font.GothamBold
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = header
+
+local gameTitle = Instance.new("TextLabel")
+gameTitle.BackgroundTransparency = 1
+gameTitle.Position = UDim2.fromOffset(19,42)
+gameTitle.Size = UDim2.new(1,-38,0,20)
+gameTitle.Text = "ROUBE UM OVO"
+gameTitle.TextColor3 = Color3.fromRGB(150,150,165)
+gameTitle.TextSize = 13
+gameTitle.Font = Enum.Font.GothamMedium
+gameTitle.TextXAlignment = Enum.TextXAlignment.Left
+gameTitle.Parent = header
+
+local status = Instance.new("TextLabel")
+status.BackgroundTransparency = 1
+status.Position = UDim2.fromOffset(19,64)
+status.Size = UDim2.new(1,-38,0,18)
+status.Text = "Procurando ovos..."
+status.TextColor3 = Color3.fromRGB(100,255,150)
+status.TextSize = 11
+status.Font = Enum.Font.Gotham
+status.TextXAlignment = Enum.TextXAlignment.Left
+status.Parent = header
 
 --==================================================
 -- LISTA
 --==================================================
 
-local List = Instance.new("ScrollingFrame")
-List.Name = "List"
-List.Size = UDim2.new(1,-20,1,-110)
-List.Position = UDim2.new(0,10,0,105)
-List.BackgroundColor3 = Color3.fromRGB(12,12,15)
-List.BorderSizePixel = 0
-List.ScrollBarThickness = 5
-List.CanvasSize = UDim2.new(0,0,0,0)
-List.Parent = Main
+local list = Instance.new("ScrollingFrame")
+list.Size = UDim2.new(1,-24,1,-185)
+list.Position = UDim2.fromOffset(12,110)
+list.BackgroundTransparency = 1
+list.BorderSizePixel = 0
+list.ScrollBarThickness = 3
+list.CanvasSize = UDim2.new()
+list.Parent = panel
 
-local ListCorner = Instance.new("UICorner")
-ListCorner.CornerRadius = UDim.new(0,10)
-ListCorner.Parent = List
-
-local Layout = Instance.new("UIListLayout")
-Layout.Padding = UDim.new(0,6)
-Layout.SortOrder = Enum.SortOrder.LayoutOrder
-Layout.Parent = List
+local layout = Instance.new("UIListLayout")
+layout.Padding = UDim.new(0,8)
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+layout.Parent = list
 
 --==================================================
--- CORES DAS RARIDADES
+-- FUNÇÕES PARA LER DADOS
 --==================================================
 
-local RarityColors = {
-    Common = Color3.fromRGB(190,190,190),
-    Uncommon = Color3.fromRGB(80,220,100),
-    Rare = Color3.fromRGB(70,150,255),
-    Epic = Color3.fromRGB(180,80,255),
-    Legendary = Color3.fromRGB(255,190,50),
-    Mythic = Color3.fromRGB(255,70,70),
-    Secret = Color3.fromRGB(255,70,200),
-}
+local function texto(v)
+	if v == nil then
+		return nil
+	end
 
-local function getRarityColor(rarity)
-    return RarityColors[rarity] or Color3.fromRGB(255,255,255)
+	if typeof(v) == "string"
+	or typeof(v) == "number" then
+		return tostring(v)
+	end
+
+	return nil
+end
+
+local function procurarCampo(tbl, nomes)
+	if type(tbl) ~= "table" then
+		return nil
+	end
+
+	for _, nome in ipairs(nomes) do
+		for chave, valor in pairs(tbl) do
+			if string.lower(tostring(chave)) == string.lower(nome) then
+				local t = texto(valor)
+
+				if t then
+					return t
+				end
+			end
+		end
+	end
+
+	return nil
+end
+
+local function encontrarModulo()
+	local atual = ReplicatedStorage
+
+	local caminhos = {
+		{"Client","EggState"},
+		{"Shared","Modules","EggState"},
+		{"Shared","EggState"},
+		{"EggState"}
+	}
+
+	for _, caminho in ipairs(caminhos) do
+		local obj = atual
+
+		for _, nome in ipairs(caminho) do
+			obj = obj:FindFirstChild(nome)
+
+			if not obj then
+				break
+			end
+		end
+
+		if obj and obj:IsA("ModuleScript") then
+			return obj
+		end
+	end
+
+	return nil
+end
+
+local function lerEggState()
+	local module = encontrarModulo()
+
+	if not module then
+		return nil
+	end
+
+	local ok, result = pcall(function()
+		local m = require(module)
+
+		if type(m.ReadFieldEggs) == "function" then
+			return m.ReadFieldEggs()
+		end
+
+		return m
+	end)
+
+	if ok then
+		return result
+	end
+
+	return nil
 end
 
 --==================================================
--- POSIÇÃO
+-- PROCURAR MODELOS NA WORKSPACE
 --==================================================
 
-local function getPosition(obj)
-    if not obj then return nil end
+local function nomePareceOvo(nome)
+	nome = string.lower(nome)
 
-    if obj:IsA("BasePart") then
-        return obj.Position
-    end
+	return string.find(nome,"egg")
+		or string.find(nome,"ovo")
+		or string.find(nome,"pet")
+end
 
-    if obj:IsA("Model") then
-        local primary = obj.PrimaryPart
+local function coletarWorkspace()
 
-        if primary then
-            return primary.Position
-        end
+	local encontrados = {}
 
-        local part = obj:FindFirstChildWhichIsA(
-            "BasePart",
-            true
-        )
+	for _, obj in ipairs(workspace:GetDescendants()) do
 
-        if part then
-            return part.Position
-        end
-    end
+		if (obj:IsA("Model") or obj:IsA("BasePart"))
+		and nomePareceOvo(obj.Name) then
 
-    return nil
+			local pos
+
+			if obj:IsA("Model") then
+				local ok, cf = pcall(function()
+					return obj:GetPivot()
+				end)
+
+				if ok then
+					pos = cf.Position
+				end
+			else
+				pos = obj.Position
+			end
+
+			if pos then
+				table.insert(encontrados,{
+					nome = obj.Name,
+					pos = pos,
+					raridade = "Unknown",
+					valor = "?",
+					multiplicador = "?"
+				})
+			end
+		end
+	end
+
+	return encontrados
 end
 
 --==================================================
--- NOME
+-- CONVERTER EGGSTATE
 --==================================================
 
-local function getDisplayName(obj)
-    if not obj then
-        return "Unknown"
-    end
+local function converterTabela(data)
 
-    local atributos = {
-        "DisplayName",
-        "Name",
-        "EggName",
-        "PetName",
-    }
+	local encontrados = {}
 
-    for _,nome in ipairs(atributos) do
-        local valor = obj:GetAttribute(nome)
+	if type(data) ~= "table" then
+		return encontrados
+	end
 
-        if valor ~= nil then
-            return tostring(valor)
-        end
-    end
+	for chave, valor in pairs(data) do
 
-    return obj.Name
+		if type(valor) == "table" then
+
+			local nome =
+				procurarCampo(valor,{
+					"DisplayName",
+					"displayName",
+					"Name",
+					"name",
+					"PetName",
+					"EggName",
+					"petName"
+				})
+
+			local raridade =
+				procurarCampo(valor,{
+					"Rarity",
+					"rarity",
+					"Tier"
+				})
+
+			local valorMoney =
+				procurarCampo(valor,{
+					"Income",
+					"IncomePerSecond",
+					"Money",
+					"Value",
+					"Earnings"
+				})
+
+			local mult =
+				procurarCampo(valor,{
+					"Multiplier",
+					"multiplier",
+					"Mutation"
+				})
+
+			if nome then
+
+				table.insert(encontrados,{
+					nome = nome,
+					raridade = raridade or "Unknown",
+					valor = valorMoney or "?",
+					multiplicador = mult or "1x"
+				})
+			end
+		end
+	end
+
+	return encontrados
 end
 
 --==================================================
--- RARIDADE
+-- CRIAR ITEM
 --==================================================
 
-local function getRarity(obj)
-    if not obj then
-        return "Common"
-    end
+local function criarItem(dados, ordem)
 
-    local nomes = {
-        "Rarity",
-        "Raridade",
-        "Tier",
-    }
+	local item = Instance.new("Frame")
+	item.Size = UDim2.new(1,-6,0,76)
+	item.BackgroundColor3 = Color3.fromRGB(27,27,34)
+	item.LayoutOrder = ordem
+	item.Parent = list
 
-    for _,nome in ipairs(nomes) do
-        local valor = obj:GetAttribute(nome)
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0,14)
+	corner.Parent = item
 
-        if valor ~= nil then
-            return tostring(valor)
-        end
-    end
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.fromRGB(42,42,52)
+	stroke.Thickness = 1
+	stroke.Parent = item
 
-    return "Common"
+	-- ÍCONE
+	local iconBox = Instance.new("Frame")
+	iconBox.Size = UDim2.fromOffset(58,58)
+	iconBox.Position = UDim2.fromOffset(9,9)
+	iconBox.BackgroundColor3 = Color3.fromRGB(13,13,18)
+	iconBox.Parent = item
+
+	local iconCorner = Instance.new("UICorner")
+	iconCorner.CornerRadius = UDim.new(0,12)
+	iconCorner.Parent = iconBox
+
+	local icon = Instance.new("TextLabel")
+	icon.Size = UDim2.fromScale(1,1)
+	icon.BackgroundTransparency = 1
+	icon.Text = "🥚"
+	icon.TextSize = 28
+	icon.Parent = iconBox
+
+	-- NOME
+	local name = Instance.new("TextLabel")
+	name.BackgroundTransparency = 1
+	name.Position = UDim2.fromOffset(77,8)
+	name.Size = UDim2.new(1,-250,0,27)
+	name.Text = tostring(dados.nome)
+	name.TextColor3 = Color3.fromRGB(240,240,245)
+	name.TextSize = 16
+	name.Font = Enum.Font.GothamMedium
+	name.TextXAlignment = Enum.TextXAlignment.Left
+	name.TextTruncate = Enum.TextTruncate.AtEnd
+	name.Parent = item
+
+	-- RARIDADE
+	local rarity = Instance.new("TextLabel")
+	rarity.BackgroundTransparency = 1
+	rarity.Position = UDim2.fromOffset(77,39)
+	rarity.Size = UDim2.new(1,-250,0,20)
+	rarity.Text = tostring(dados.raridade)
+	rarity.TextColor3 = Color3.fromRGB(145,85,255)
+	rarity.TextSize = 12
+	rarity.Font = Enum.Font.Gotham
+	rarity.TextXAlignment = Enum.TextXAlignment.Left
+	rarity.Parent = item
+
+	-- MULTIPLICADOR
+	local mult = Instance.new("TextLabel")
+	mult.BackgroundTransparency = 1
+	mult.Position = UDim2.new(1,-150,0,12)
+	mult.Size = UDim2.fromOffset(60,20)
+	mult.Text = tostring(dados.multiplicador)
+	mult.TextColor3 = Color3.fromRGB(90,165,255)
+	mult.TextSize = 12
+	mult.Font = Enum.Font.GothamMedium
+	mult.Parent = item
+
+	-- VALOR
+	local money = Instance.new("TextLabel")
+	money.BackgroundTransparency = 1
+	money.Position = UDim2.new(1,-88,0,12)
+	money.Size = UDim2.fromOffset(78,20)
+	money.Text = tostring(dados.valor)
+	money.TextColor3 = Color3.fromRGB(100,255,150)
+	money.TextSize = 12
+	money.Font = Enum.Font.GothamMedium
+	money.TextXAlignment = Enum.TextXAlignment.Right
+	money.Parent = item
+
+	return item
 end
 
 --==================================================
--- INCOME
+-- ATUALIZAR LISTA
 --==================================================
 
-local function getIncome(obj)
-    if not obj then
-        return 0
-    end
+local ultimoResultado = ""
 
-    local nomes = {
-        "Income",
-        "IncomePerSecond",
-        "Earnings",
-        "MoneyPerSecond",
-        "CashPerSecond",
-    }
+local function atualizar()
 
-    for _,nome in ipairs(nomes) do
-        local valor = obj:GetAttribute(nome)
+	local dados = lerEggState()
+	local encontrados = {}
 
-        if typeof(valor) == "number" then
-            return valor
-        end
-    end
+	if dados then
+		encontrados = converterTabela(dados)
+	end
 
-    return 0
+	-- fallback
+	if #encontrados == 0 then
+		encontrados = coletarWorkspace()
+	end
+
+	local assinatura = ""
+
+	for _, d in ipairs(encontrados) do
+		assinatura = assinatura
+			.. tostring(d.nome)
+			.. tostring(d.raridade)
+			.. tostring(d.valor)
+	end
+
+	if assinatura == ultimoResultado then
+		return
+	end
+
+	ultimoResultado = assinatura
+
+	for _, child in ipairs(list:GetChildren()) do
+		if child:IsA("Frame") then
+			child:Destroy()
+		end
+	end
+
+	for i, dadosItem in ipairs(encontrados) do
+		criarItem(dadosItem,i)
+	end
+
+	task.wait()
+
+	list.CanvasSize = UDim2.new(
+		0,
+		0,
+		0,
+		layout.AbsoluteContentSize.Y + 10
+	)
+
+	status.Text =
+		#encontrados > 0
+		and (#encontrados .. " encontrados na esteira")
+		or "Nenhum ovo encontrado"
 end
 
 --==================================================
--- ÍCONE
---==================================================
-
-local function getIcon(obj)
-    if not obj then
-        return nil
-    end
-
-    local nomes = {
-        "Icon",
-        "IconId",
-        "Image",
-        "ImageId",
-    }
-
-    for _,nome in ipairs(nomes) do
-        local valor = obj:GetAttribute(nome)
-
-        if valor then
-            local texto = tostring(valor)
-
-            if string.find(texto,"rbxassetid://") then
-                return texto
-            end
-
-            if tonumber(texto) then
-                return "rbxassetid://" .. texto
-            end
-        end
-    end
-
-    return nil
-end
-
---==================================================
--- PROCURA OVOS / PETS
---==================================================
-
-local function procurarOvos()
-    local encontrados = {}
-
-    -- Primeiro tenta EggState
-    if EggState then
-        pcall(function()
-            if typeof(EggState.ReadFieldEggs) == "function" then
-                local registros = EggState.ReadFieldEggs()
-
-                if typeof(registros) == "table" then
-                    for _,registro in pairs(registros) do
-                        table.insert(encontrados,registro)
-                    end
-                end
-            end
-        end)
-    end
-
-    -- Fallback: procura objetos no Workspace
-    if #encontrados == 0 then
-        for _,obj in ipairs(workspace:GetDescendants()) do
-            if obj:IsA("Model") or obj:IsA("BasePart") then
-
-                local nome = string.lower(obj.Name)
-
-                if string.find(nome,"egg")
-                    or string.find(nome,"ovo")
-                    or string.find(nome,"pet") then
-
-                    table.insert(encontrados,obj)
-                end
-            end
-        end
-    end
-
-    return encontrados
-end
-
---==================================================
--- CRIA LINHA
---==================================================
-
-local function createRow(dados,index)
-    local Row = Instance.new("Frame")
-    Row.Size = UDim2.new(1,-10,0,70)
-    Row.BackgroundColor3 = Color3.fromRGB(25,25,30)
-    Row.BorderSizePixel = 0
-    Row.LayoutOrder = index
-    Row.Parent = List
-
-    local RowCorner = Instance.new("UICorner")
-    RowCorner.CornerRadius = UDim.new(0,8)
-    RowCorner.Parent = Row
-
-    -- Ícone
-    local Icon = Instance.new("ImageLabel")
-    Icon.Size = UDim2.new(0,55,0,55)
-    Icon.Position = UDim2.new(0,7,0,7)
-    Icon.BackgroundTransparency = 1
-
-    if dados.Icon then
-        Icon.Image = dados.Icon
-    end
-
-    Icon.Parent = Row
-
-    -- Nome
-    local Name = Instance.new("TextLabel")
-    Name.Size = UDim2.new(1,-75,0,22)
-    Name.Position = UDim2.new(0,70,0,5)
-    Name.BackgroundTransparency = 1
-    Name.TextXAlignment = Enum.TextXAlignment.Left
-    Name.Text = dados.Name
-    Name.TextColor3 = Color3.fromRGB(255,255,255)
-    Name.Font = Enum.Font.GothamBold
-    Name.TextSize = 15
-    Name.Parent = Row
-
-    -- Raridade
-    local Rarity = Instance.new("TextLabel")
-    Rarity.Size = UDim2.new(0.5,-35,0,18)
-    Rarity.Position = UDim2.new(0,70,0,28)
-    Rarity.BackgroundTransparency = 1
-    Rarity.TextXAlignment = Enum.TextXAlignment.Left
-    Rarity.Text = "⭐ "..dados.Rarity
-    Rarity.TextColor3 = getRarityColor(dados.Rarity)
-    Rarity.Font = Enum.Font.Gotham
-    Rarity.TextSize = 12
-    Rarity.Parent = Row
-
-    -- Income
-    local Income = Instance.new("TextLabel")
-    Income.Size = UDim2.new(0.5,-35,0,18)
-    Income.Position = UDim2.new(0,70,0,47)
-    Income.BackgroundTransparency = 1
-    Income.TextXAlignment = Enum.TextXAlignment.Left
-    Income.Text = "💰 $"..tostring(dados.Income).."/s"
-    Income.TextColor3 = Color3.fromRGB(80,255,120)
-    Income.Font = Enum.Font.Gotham
-    Income.TextSize = 12
-    Income.Parent = Row
-
-    -- Distância
-    local Distance = Instance.new("TextLabel")
-    Distance.Size = UDim2.new(0,90,0,20)
-    Distance.Position = UDim2.new(1,-100,0,25)
-    Distance.BackgroundTransparency = 1
-    Distance.Text = string.format(
-        "📏 %.0fm",
-        dados.Distance
-    )
-    Distance.TextColor3 = Color3.fromRGB(200,200,200)
-    Distance.Font = Enum.Font.Gotham
-    Distance.TextSize = 12
-    Distance.Parent = Row
-end
-
---==================================================
--- ATUALIZA ESP
---==================================================
-
-local function updateESP()
-    if not ESP_ATIVO then
-        return
-    end
-
-    for _,obj in ipairs(List:GetChildren()) do
-        if obj:IsA("Frame") then
-            obj:Destroy()
-        end
-    end
-
-    local char = Player.Character
-    local hrp = char and char:FindFirstChild(
-        "HumanoidRootPart"
-    )
-
-    if not hrp then
-        return
-    end
-
-    local objetos = procurarOvos()
-    local dados = {}
-
-    for _,obj in ipairs(objetos) do
-        local pos = getPosition(obj)
-
-        if pos then
-            local distancia =
-                (hrp.Position - pos).Magnitude
-
-            if distancia <= MAX_DISTANCE then
-                table.insert(dados,{
-                    Object = obj,
-                    Name = getDisplayName(obj),
-                    Rarity = getRarity(obj),
-                    Income = getIncome(obj),
-                    Icon = getIcon(obj),
-                    Distance = distancia
-                })
-            end
-        end
-    end
-
-    -- Mais dinheiro primeiro
-    table.sort(dados,function(a,b)
-        return a.Income > b.Income
-    end)
-
-    for i,dado in ipairs(dados) do
-        createRow(dado,i)
-    end
-
-    List.CanvasSize =
-        UDim2.new(
-            0,
-            0,
-            0,
-            Layout.AbsoluteContentSize.Y + 10
-        )
-end
-
---==================================================
--- LOOP
+-- ATUALIZAÇÃO AUTOMÁTICA
 --==================================================
 
 task.spawn(function()
-    while task.wait(UPDATE_TIME) do
-        pcall(updateESP)
-    end
+
+	while gui.Parent do
+
+		pcall(atualizar)
+
+		task.wait(1)
+	end
 end)
 
-print("🥚 Egg/Pet ESP carregado!")
+--==================================================
+-- GO / STOP
+--==================================================
+
+local go = Instance.new("TextButton")
+go.Size = UDim2.new(.5,-17,0,58)
+go.Position = UDim2.new(0,12,1,-70)
+go.BackgroundColor3 = Color3.fromRGB(255,45,55)
+go.Text = "GO"
+go.TextColor3 = Color3.new(1,1,1)
+go.TextSize = 18
+go.Font = Enum.Font.GothamBold
+go.Parent = panel
+
+local gc = Instance.new("UICorner")
+gc.CornerRadius = UDim.new(0,15)
+gc.Parent = go
+
+local stop = Instance.new("TextButton")
+stop.Size = UDim2.new(.5,-17,0,58)
+stop.Position = UDim2.new(.5,5,1,-70)
+stop.BackgroundColor3 = Color3.fromRGB(28,28,35)
+stop.Text = "STOP"
+stop.TextColor3 = Color3.fromRGB(255,100,110)
+stop.TextSize = 18
+stop.Font = Enum.Font.GothamBold
+stop.Parent = panel
+
+local sc = Instance.new("UICorner")
+sc.CornerRadius = UDim.new(0,15)
+sc.Parent = stop
+
+local ativo = false
+
+go.Activated:Connect(function()
+	ativo = true
+	go.Text = "ATIVO"
+	go.BackgroundColor3 = Color3.fromRGB(35,190,95)
+end)
+
+stop.Activated:Connect(function()
+	ativo = false
+	go.Text = "GO"
+	go.BackgroundColor3 = Color3.fromRGB(255,45,55)
+end)
+
+--==================================================
+-- ARRASTAR BOTÃO
+--==================================================
+
+local dragging = false
+local moved = false
+local dragStart
+local startPosition
+
+floating.InputBegan:Connect(function(input)
+
+	if input.UserInputType == Enum.UserInputType.MouseButton1
+	or input.UserInputType == Enum.UserInputType.Touch then
+
+		dragging = true
+		moved = false
+		dragStart = input.Position
+		startPosition = floating.Position
+	end
+end)
+
+UIS.InputChanged:Connect(function(input)
+
+	if not dragging then
+		return
+	end
+
+	if input.UserInputType == Enum.UserInputType.MouseMovement
+	or input.UserInputType == Enum.UserInputType.Touch then
+
+		local delta = input.Position - dragStart
+
+		if math.abs(delta.X) > 7
+		or math.abs(delta.Y) > 7 then
+			moved = true
+		end
+
+		floating.Position = UDim2.new(
+			startPosition.X.Scale,
+			startPosition.X.Offset + delta.X,
+			startPosition.Y.Scale,
+			startPosition.Y.Offset + delta.Y
+		)
+	end
+end)
+
+UIS.InputEnded:Connect(function(input)
+
+	if input.UserInputType == Enum.UserInputType.MouseButton1
+	or input.UserInputType == Enum.UserInputType.Touch then
+
+		if dragging then
+
+			dragging = false
+
+			if not moved then
+				panel.Visible = not panel.Visible
+			end
+		end
+	end
+end)
